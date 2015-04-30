@@ -82,12 +82,12 @@ try {
             defaultOptionMap = {
                 history: true, // CSS history knocking or not .. can be network intensive
                 java: true, // Java applet on/off... may prompt users for permission to run.
-                tests: 10, // 1000 what is it, actually?
                 silverlight: true, // you might want to turn it off https://github.com/samyk/evercookie/issues/45
+                tests: 10, // 1000 what is it, actually?
                 domain: '.' + window.location.host.replace(/:\d+/, ''), // Get current domain
                 baseurl: '', // base url for php, flash and silverlight assets
-                asseturi: '/assets', // assets = .fla, .jar, etc
-                phpuri: '/php', // php file path or route
+                asseturi: 'assets', // assets = .fla, .jar, etc
+                phpuri: 'php', // php file path or route
                 authPath: false, //'/evercookie_auth.php', // set to false to disable Basic Authentication cache
                 pngCookieName: 'evercookie_png',
                 pngPath: '/evercookie_png.php',
@@ -148,7 +148,7 @@ try {
 
         // necessary for flash to communicate with js...
         // please implement a better way
-        function _evercookie_flash_var(cookie) {
+        function _flash_var(cookie) {
             _global_lso = cookie;
 
             // remove the flash object now
@@ -157,18 +157,21 @@ try {
                 swf.parentNode.removeChild(swf);
             }
         }
+        window._evercookie_flash_var = _flash_var; //TODO recompile evercookie.swf to use _ec_flash_var
 
         /*
          * Again, ugly workaround....same problem as flash.
          */
-        function onSilverlightLoad(sender, args) {
+        function _onSilverlightLoad(sender, args) {
             var control = sender.getHost();
             _global_isolated = control.Content.App.getIsolatedStorage();
         }
+        window._ec_onSilverlightLoad = _onSilverlightLoad;
 
-        function onSilverlightError(sender, args) {
+        function _onSilverlightError(sender, args) {
             _global_isolated = "";
         }
+        window._ec_onSilverlightError = _onSilverlightError;
 
         /**
          * @class Evercookie
@@ -192,6 +195,7 @@ try {
         function Evercookie(options) {
             options = options || {};
             var opts = {};
+
             for (var key in defaultOptionMap) {
                 var optValue = options[key];
                 if (typeof optValue !== 'undefined') {
@@ -200,8 +204,16 @@ try {
                     opts[key] = defaultOptionMap[key];
                 }
             }
+
             if (typeof opts.domain === 'function') {
                 opts.domain = opts.domain(window);
+            }
+
+            if (typeof opts.baseurl == 'string') {
+                // Ensure baseurl ends with / unless it's blank, then allow relative paths.
+                if (opts.baseurl.length > 0) {
+                    opts.baseurl = opts.baseurl.replace(/^\/$/, '') + '/';
+                }
             }
             var _ec_history = opts.history,
                 _ec_java = opts.java,
@@ -546,60 +558,67 @@ try {
 
             this.evercookie_png = function(name, value) {
                 var canvas = document.createElement("canvas"),
-                    img, ctx, origvalue;
+                    img,
+                    ctx,
+                    origvalue;
+
+                if (!canvas || !canvas.getContext) {
+                    return;
+                }
+
                 canvas.style.visibility = "hidden";
                 canvas.style.position = "absolute";
                 canvas.width = 200;
                 canvas.height = 1;
-                if (canvas && canvas.getContext) {
-                    // {{opts.pngPath}} handles the hard part of generating the image
-                    // based off of the http cookie and returning it cached
-                    img = new Image();
-                    img.style.visibility = "hidden";
-                    img.style.position = "absolute";
-                    if (value !== undefined) {
-                        // make sure we have evercookie session defined first
-                        document.cookie = opts.pngCookieName + "=" + value + "; path=/; domain=" + _ec_domain;
-                    } else {
-                        self._ec.pngData = undefined;
-                        ctx = canvas.getContext("2d");
 
-                        // interestingly enough, we want to erase our evercookie
-                        // http cookie so the php will force a cached response
-                        origvalue = this.getFromStr(opts.pngCookieName, document.cookie);
-                        document.cookie = opts.pngCookieName + "=; expires=Mon, 20 Sep 2010 00:00:00 UTC; path=/; domain=" + _ec_domain;
+                // {{opts.pngPath}} handles the hard part of generating the image
+                // based off of the http cookie and returning it cached
+                img = new Image();
+                img.style.visibility = "hidden";
+                img.style.position = "absolute";
 
-                        img.onload = function() {
-                            // put our cookie back
-                            document.cookie = opts.pngCookieName + "=" + origvalue + "; expires=Tue, 31 Dec 2030 00:00:00 UTC; path=/; domain=" + _ec_domain;
+                if (value !== undefined) {
+                    // make sure we have evercookie session defined first
+                    document.cookie = opts.pngCookieName + "=" + value + "; path=/; domain=" + _ec_domain;
+                } else {
+                    self._ec.pngData = undefined;
+                    ctx = canvas.getContext("2d");
 
-                            self._ec.pngData = "";
-                            ctx.drawImage(img, 0, 0);
+                    // interestingly enough, we want to erase our evercookie
+                    // http cookie so the php will force a cached response
+                    origvalue = this.getFromStr(opts.pngCookieName, document.cookie);
+                    document.cookie = opts.pngCookieName + "=; expires=Mon, 20 Sep 2010 00:00:00 UTC; path=/; domain=" + _ec_domain;
 
-                            // get CanvasPixelArray from  given coordinates and dimensions
-                            var imgd = ctx.getImageData(0, 0, 200, 1),
-                                pix = imgd.data,
-                                i, n;
+                    img.onload = function() {
+                        // put our cookie back
+                        document.cookie = opts.pngCookieName + "=" + origvalue + "; expires=Tue, 31 Dec 2030 00:00:00 UTC; path=/; domain=" + _ec_domain;
 
-                            // loop over each pixel to get the "RGB" values (ignore alpha)
-                            for (i = 0, n = pix.length; i < n; i += 4) {
-                                if (pix[i] === 0) {
-                                    break;
-                                }
-                                self._ec.pngData += String.fromCharCode(pix[i]);
-                                if (pix[i + 1] === 0) {
-                                    break;
-                                }
-                                self._ec.pngData += String.fromCharCode(pix[i + 1]);
-                                if (pix[i + 2] === 0) {
-                                    break;
-                                }
-                                self._ec.pngData += String.fromCharCode(pix[i + 2]);
+                        self._ec.pngData = "";
+                        ctx.drawImage(img, 0, 0);
+
+                        // get CanvasPixelArray from  given coordinates and dimensions
+                        var imgd = ctx.getImageData(0, 0, 200, 1),
+                            pix = imgd.data,
+                            i, n;
+
+                        // loop over each pixel to get the "RGB" values (ignore alpha)
+                        for (i = 0, n = pix.length; i < n; i += 4) {
+                            if (pix[i] === 0) {
+                                break;
                             }
-                        };
-                    }
-                    img.src = _ec_baseurl + _ec_phpuri + opts.pngPath + "?name=" + name + "&cookie=" + opts.pngCookieName;
+                            self._ec.pngData += String.fromCharCode(pix[i]);
+                            if (pix[i + 1] === 0) {
+                                break;
+                            }
+                            self._ec.pngData += String.fromCharCode(pix[i + 1]);
+                            if (pix[i + 2] === 0) {
+                                break;
+                            }
+                            self._ec.pngData += String.fromCharCode(pix[i + 2]);
+                        }
+                    };
                 }
+                img.src = _ec_baseurl + _ec_phpuri + opts.pngPath + "?name=" + name + "&cookie=" + opts.pngCookieName;
             };
 
             this.evercookie_local_storage = function(name, value) {
@@ -768,34 +787,30 @@ try {
                 var source = _ec_baseurl + _ec_asseturi + "/evercookie.xap",
                     minver = "4.0.50401.0",
                     initParam = "",
-                    html;
+                    object;
+
                 if (value !== undefined) {
-                    initParam = '<param name="initParams" value="' + name + '=' + value + '" />';
+                    initParam = '<param name="initParams" value="' + escape(name) + '=' + escape(value) + '" />';
                 }
 
-                html =
-                    '<object style="position:absolute;left:-500px;top:-500px" data="data:application/x-silverlight-2," type="application/x-silverlight-2" id="mysilverlight" width="0" height="0">' +
-                    initParam +
+                object = document.createElement('object');
+                object.style.position = 'absolute';
+                object.style.left = '-10000px';
+                object.data = 'data:application/x-silverlight-2,';
+                object.type = 'application/x-silverlight-2';
+                object.width = 0;
+                object.height = 0;
+                object.innerHTML = initParam +
                     '<param name="source" value="' + source + '"/>' +
-                    '<param name="onLoad" value="onSilverlightLoad"/>' +
-                    '<param name="onError" value="onSilverlightError"/>' +
+                    '<param name="onLoad" value="_ec_onSilverlightLoad"/>' +
+                    '<param name="onError" value="_ec_onSilverlightError"/>' +
                     '<param name="background" value="Transparent"/>' +
                     '<param name="windowless" value="true"/>' +
                     '<param name="minRuntimeVersion" value="' + minver + '"/>' +
                     '<param name="autoUpgrade" value="false"/>' +
-                    '<a href="http://go.microsoft.com/fwlink/?LinkID=149156&v=' + minver + '" style="display:none">' +
-                    'Get Microsoft Silverlight' +
-                    '</a>' +
-                    '</object>';
-                try {
-                    if (typeof jQuery === 'undefined') {
-                        document.body.appendChild(html);
-                    } else {
-                        $('body').append(html);
-                    }
-                } catch (ignore) {
-                    // do nothing
-                }
+                    '<a href="http://go.microsoft.com/fwlink/?LinkID=149156&v=' + minver + '" style="display:none">Get Microsoft Silverlight</a>';
+
+                document.body.appendChild(object);
             };
 
             // public method for encoding
@@ -1170,7 +1185,6 @@ try {
 
         };
 
-        window._evercookie_flash_var = _evercookie_flash_var;
         /**
          * Because Evercookie is a class, it should has first letter in capital
          * Keep first letter in small for legacy purpose
