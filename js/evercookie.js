@@ -525,11 +525,15 @@ try {
                 }
 
                 function doSetOrGet(appletId) {
-                    var applet = document.getElementById(appletId);
-                    if (value !== undefined) {
-                        applet.set(name, value);
-                    } else {
-                        self._ec.javaData = applet.get(name);
+                    try {
+                        var applet = document.getElementById(appletId);
+                        if (value !== undefined) {
+                            applet.set(name, value);
+                        } else {
+                            self._ec.javaData = applet.get(name);
+                        }
+                    } catch (ignore) {
+                        // do nothing
                     }
                 }
 
