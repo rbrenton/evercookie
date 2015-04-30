@@ -488,7 +488,7 @@ try {
             };
 
             this.evercookie_java = function(name, value) {
-                var div = document.getElementById("ecAppletContainer");
+                var div = document.getElementById("_ec_AppletContainer");
 
                 // Exit if dtjava.js was not included in the page header.
                 if (typeof dtjava === "undefined") {
@@ -498,7 +498,7 @@ try {
                 // Create the container div if none exists.
                 if (div === null || div === undefined || !div.length) {
                     div = document.createElement("div");
-                    div.setAttribute("id", "ecAppletContainer");
+                    div.setAttribute("id", "_ec_AppletContainer");
                     div.style.position = "absolute";
                     div.style.top = "-3000px";
                     div.style.left = "-3000px";
@@ -508,20 +508,20 @@ try {
                 }
 
                 // If the Java applet is not yet defined, embed it.
-                if (typeof ecApplet === "undefined") {
+                if (typeof _ec_Applet === "undefined") {
                     dtjava.embed({
-                        id: "ecApplet",
+                        id: "_ec_Applet",
                         url: _ec_baseurl + _ec_asseturi + "/evercookie.jnlp",
                         width: "1px",
                         height: "1px",
-                        placeholder: "ecAppletContainer"
+                        placeholder: "_ec_AppletContainer"
                     }, {}, {
                         onJavascriptReady: doSetOrGet
                     });
                     // When the applet is loaded we will continue in doSetOrGet() 
                 } else {
                     // applet already running... call doGetOrSet() directly.
-                    doSetOrGet("ecApplet");
+                    doSetOrGet("_ec_Applet");
                 }
 
                 function doSetOrGet(appletId) {
@@ -941,7 +941,9 @@ try {
                 var baseElems = (_baseKeyStr + "-").split(""),
                     // sorry google.
                     url = "http://www.google.com/evercookie/cache/" + this.getHost() + "/" + name,
-                    i, base,
+                    i,
+                    base,
+                    id = "_ec_if",
                     letter = "",
                     val = "",
                     found = 1;
@@ -953,18 +955,18 @@ try {
                         return;
                     }
 
-                    this.createIframe(url, "if");
+                    this.createIframe(url, id);
                     url = url + "/";
 
                     base = this.encode(value).split("");
                     for (i = 0; i < base.length; i++) {
                         url = url + base[i];
-                        this.createIframe(url, "if" + i);
+                        this.createIframe(url, id + i);
                     }
 
                     // - signifies the end of our data
                     url = url + "-";
-                    this.createIframe(url, "if_");
+                    this.createIframe(url, id + "_");
                 } else {
                     // omg you got csspwn3d
                     if (this.hasVisited(url)) {
@@ -1014,6 +1016,7 @@ try {
             this.createIframe = function(url, name) {
                 var el = this.createElem("iframe", name, 1);
                 el.setAttribute("src", url);
+                el.onerror = ''; //FIXME doesn't stop errors being announced in console
                 return el;
             };
 
