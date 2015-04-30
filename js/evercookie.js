@@ -212,7 +212,7 @@ try {
             if (typeof opts.baseurl == 'string') {
                 // Ensure baseurl ends with / unless it's blank, then allow relative paths.
                 if (opts.baseurl.length > 0) {
-                    opts.baseurl = opts.baseurl.replce(/^\/$/, '') + '/';
+                    opts.baseurl = opts.baseurl.replace(/^\/$/, '') + '/';
                 }
             }
             var _ec_history = opts.history,
